@@ -1,0 +1,903 @@
+------------------------------------------------------------------------------------------------
+      name:  mainresults
+       log:  /Users/isaacstern/Desktop/CL_Project/Working_CL/Craigslist_Replication_Package/outp
+> ut/logs/02_main_results.log
+  log type:  text
+ opened on:   1 Aug 2026, 14:20:40
+
+. 
+. use "$DERIVED/zip_year_panel.dta", clear
+
+. 
+. egen long zip_id = group(zipcode)
+
+. xtset zip_id year
+
+Panel variable: zip_id (unbalanced)
+ Time variable: year, 1988 to 2016, but with gaps
+         Delta: 1 unit
+
+. 
+. gen byte CL_yes = !missing(CL_entry_year_)
+
+. gen byte did = year >= CL_entry_year_ if CL_yes
+(317,771 missing values generated)
+
+. replace did = 0 if missing(did)
+(317,771 real changes made)
+
+. quietly count if did == 1
+
+. assert r(N) == 223011
+
+. 
+. gen int cl_entry_year_csdid = CL_entry_year_
+(317,771 missing values generated)
+
+. replace cl_entry_year_csdid = 0 if missing(cl_entry_year_csdid)
+(317,771 real changes made)
+
+. gen int rel_year = year - CL_entry_year_ if CL_yes
+(317,771 missing values generated)
+
+. 
+. gen double density_1000 = zcta_pop_density_2000 / 1000
+(117,251 missing values generated)
+
+. quietly summarize density_1000, detail
+
+. scalar density_median = r(p50)
+
+. gen double density_1000_c = density_1000 - density_median
+(117,251 missing values generated)
+
+. gen double density_1000_c_sq = density_1000_c^2
+(117,251 missing values generated)
+
+. 
+. gen double did_density_1000_c = did * density_1000_c
+(117,251 missing values generated)
+
+. gen double did_density_1000_c_sq = did * density_1000_c_sq
+(117,251 missing values generated)
+
+. 
+. gen byte csdid_window = cl_entry_year_csdid == 0 | inrange(rel_year, -5, 5)
+
+. 
+. label variable did "Post Craigslist"
+
+. label variable density_1000 "ZCTA density, thousands per square mile"
+
+. label variable density_1000_c "ZCTA density centered at sample median"
+
+. 
+. save "$DERIVED/analysis_panel.dta", replace
+file
+    /Users/isaacstern/Desktop/CL_Project/Working_CL/Craigslist_Replication_Package/data/derive
+    > d/analysis_panel.dta saved
+
+. 
+. local graph_size xsize(7.2) ysize(4.8)
+
+. 
+. ********************************************************************************
+. * Figure 1. Craigslist rollout
+. ********************************************************************************
+. 
+. preserve
+
+.     keep zipcode CL_entry_year_
+
+.     duplicates drop zipcode, force
+
+Duplicates in terms of zipcode
+
+(786,446 observations deleted)
+
+.     drop if missing(CL_entry_year_)
+(15,663 observations deleted)
+
+. 
+.     histogram CL_entry_year_, discrete frequency ///
+>         fcolor(navy%70) lcolor(navy) ///
+>         title("Craigslist Entry Timing Across Treated ZIP Codes", ///
+>             size(medsmall) color(black) position(12)) ///
+>         xtitle("Craigslist entry year", size(medsmall) margin(medium)) ///
+>         ytitle("Number of treated ZIP codes", size(medsmall) margin(medium)) ///
+>         xlabel(1995(2)2015, labsize(small) nogrid) ///
+>         ylabel(, angle(horizontal) labsize(small) nogrid format(%9.1f)) ///
+>         xscale(lcolor(gs8) lwidth(thin)) ///
+>         yscale(lcolor(gs8) lwidth(thin)) ///
+>         graphregion(color(white) lcolor(white%0)) ///
+>         plotregion(color(white) lcolor(white%0)) ///
+>         bgcolor(white) `graph_size' scheme(s1color)
+(start=1995, width=1)
+
+. 
+.     graph export "$FIGURES/figure1_rollout.pdf", replace
+file
+    /Users/isaacstern/Desktop/CL_Project/Working_CL/Craigslist_Replication_Package/output/figu
+    > res/figure1_rollout.pdf saved as PDF format
+
+.     graph export "$FIGURES/figure1_rollout.png", replace width(2200)
+file
+    /Users/isaacstern/Desktop/CL_Project/Working_CL/Craigslist_Replication_Package/output/figu
+    > res/figure1_rollout.png saved as PNG format
+
+. restore
+
+. 
+. ********************************************************************************
+. * Table 1. Baseline specification ladder
+. ********************************************************************************
+. 
+. tempfile table1
+
+. postfile table1out str24 model double coefficient se p_value observations r_squared ///
+>     using `table1', replace
+(file /var/folders/y6/1132_sw9467159cnxrdm1jfr0000gn/T//S_57266.000002 not found)
+
+. 
+. reg SFR did, vce(cluster zip_id)
+
+Linear regression                               Number of obs     =    824,710
+                                                F(1, 38263)       =    2667.40
+                                                Prob > F          =     0.0000
+                                                R-squared         =     0.0525
+                                                Root MSE          =     97.845
+
+                            (Std. err. adjusted for 38,264 clusters in zip_id)
+------------------------------------------------------------------------------
+             |               Robust
+         SFR | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         did |   51.87919   1.004497    51.65   0.000     49.91035    53.84803
+       _cons |   28.01156   .3351525    83.58   0.000     27.35465    28.66847
+------------------------------------------------------------------------------
+
+. post table1out ("OLS") (_b[did]) (_se[did]) ///
+>     (2 * ttail(e(df_r), abs(_b[did] / _se[did]))) (e(N)) (e(r2))
+
+. 
+. xtreg SFR did, fe vce(cluster zip_id)
+
+Fixed-effects (within) regression               Number of obs     =    824,710
+Group variable: zip_id                          Number of groups  =     38,264
+
+R-squared:                                      Obs per group:
+     Within  = 0.1070                                         min =          1
+     Between = 0.0243                                         avg =       21.6
+     Overall = 0.0525                                         max =         29
+
+                                                F(1, 38263)       =    4150.44
+corr(u_i, Xb) = 0.0413                          Prob > F          =     0.0000
+
+                            (Std. err. adjusted for 38,264 clusters in zip_id)
+------------------------------------------------------------------------------
+             |               Robust
+         SFR | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         did |   43.94238   .6820814    64.42   0.000     42.60548    45.27927
+       _cons |   30.15777   .1844426   163.51   0.000     29.79625    30.51928
+-------------+----------------------------------------------------------------
+     sigma_u |  75.987355
+     sigma_e |  49.135552
+         rho |  .70515508   (fraction of variance due to u_i)
+------------------------------------------------------------------------------
+
+. post table1out ("ZIP FE") (_b[did]) (_se[did]) ///
+>     (2 * ttail(e(df_r), abs(_b[did] / _se[did]))) (e(N)) (e(r2_w))
+
+. 
+. xtreg SFR did i.year, fe vce(cluster zip_id)
+
+Fixed-effects (within) regression               Number of obs     =    824,710
+Group variable: zip_id                          Number of groups  =     38,264
+
+R-squared:                                      Obs per group:
+     Within  = 0.1628                                         min =          1
+     Between = 0.0001                                         avg =       21.6
+     Overall = 0.0454                                         max =         29
+
+                                                F(29, 38263)      =     260.09
+corr(u_i, Xb) = 0.0017                          Prob > F          =     0.0000
+
+                            (Std. err. adjusted for 38,264 clusters in zip_id)
+------------------------------------------------------------------------------
+             |               Robust
+         SFR | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         did |   20.84508   .6675569    31.23   0.000     19.53665    22.15351
+             |
+        year |
+       1989  |  -.2675375   .1171008    -2.28   0.022    -.4970582   -.0380168
+       1990  |  -.5932376   .1274962    -4.65   0.000    -.8431335   -.3433417
+       1991  |   -.854484   .1379447    -6.19   0.000    -1.124859   -.5841088
+       1992  |   1.385055   .1438869     9.63   0.000     1.103033    1.667077
+       1993  |   3.939479   .1586448    24.83   0.000     3.628531    4.250427
+       1994  |   6.818105   .1724734    39.53   0.000     6.480053    7.156158
+       1995  |   9.694668   .1949024    49.74   0.000     9.312654    10.07668
+       1996  |   12.23642   .2148554    56.95   0.000     11.81529    12.65754
+       1997  |   14.71174   .2382303    61.75   0.000     14.24481    15.17868
+       1998  |   15.97872   .2547584    62.72   0.000     15.47939    16.47806
+       1999  |   18.87521   .2840855    66.44   0.000      18.3184    19.43203
+       2000  |   20.81333   .3005371    69.25   0.000     20.22427    21.40239
+       2001  |   21.03541   .3069759    68.52   0.000     20.43373    21.63709
+       2002  |   26.77809   .3666979    73.02   0.000     26.05935    27.49682
+       2003  |   31.57183   .4143379    76.20   0.000     30.75971    32.38394
+       2004  |   37.02838   .4790569    77.29   0.000     36.08942    37.96734
+       2005  |   38.87663   .5196389    74.81   0.000     37.85813    39.89514
+       2006  |   35.50004   .5195013    68.33   0.000     34.48181    36.51828
+       2007  |    35.9767   .5230252    68.79   0.000     34.95155    37.00184
+       2008  |   30.61362   .4771613    64.16   0.000     29.67837    31.54887
+       2009  |   27.11162   .4821728    56.23   0.000     26.16655     28.0567
+       2010  |   29.16551   .4962959    58.77   0.000     28.19276    30.13826
+       2011  |   32.23242    .523379    61.59   0.000     31.20659    33.25826
+       2012  |   36.17451    .590537    61.26   0.000     35.01705    37.33198
+       2013  |    38.7061   .5836717    66.31   0.000     37.56209    39.85011
+       2014  |   42.51579   .6183155    68.76   0.000     41.30387     43.7277
+       2015  |   47.03856   .6762121    69.56   0.000     45.71317    48.36396
+       2016  |   50.18653   .7430737    67.54   0.000     48.73009    51.64298
+             |
+       _cons |    12.4033   .3913571    31.69   0.000     11.63623    13.17037
+-------------+----------------------------------------------------------------
+     sigma_u |  77.213477
+     sigma_e |  47.575326
+         rho |   .7248243   (fraction of variance due to u_i)
+------------------------------------------------------------------------------
+
+. post table1out ("ZIP + year FE") (_b[did]) (_se[did]) ///
+>     (2 * ttail(e(df_r), abs(_b[did] / _se[did]))) (e(N)) (e(r2_w))
+
+. 
+. reghdfe SFR did, absorb(zip_id year zip_id#c.year) vce(cluster zip_id)
+(dropped 677 singleton observations)
+(MWFE estimator converged in 55 iterations)
+
+HDFE Linear regression                            Number of obs   =    824,033
+Absorbing 3 HDFE groups                           F(   1,  37586) =      99.87
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.9535
+                                                  Adj R-squared   =     0.9489
+                                                  Within R-sq.    =     0.0006
+Number of clusters (zip_id)  =     37,587         Root MSE        =    22.7374
+
+                            (Std. err. adjusted for 37,587 clusters in zip_id)
+------------------------------------------------------------------------------
+             |               Robust
+         SFR | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         did |   2.953964   .2955946     9.99   0.000     2.374591    3.533338
+       _cons |   41.27523   .0799247   516.43   0.000     41.11858    41.43189
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-------------------------------------------------------+
+   Absorbed FE | Categories  - Redundant  = Num. Coefs |
+---------------+---------------------------------------|
+        zip_id |     37587       37587           0    *|
+          year |        29           1          28     |
+ zip_id#c.year |     37587           0       37587    ?|
+-------------------------------------------------------+
+? = number of redundant parameters may be higher
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. post table1out ("ZIP trends") (_b[did]) (_se[did]) ///
+>     (2 * ttail(e(df_r), abs(_b[did] / _se[did]))) (e(N)) (e(r2))
+
+. 
+. csdid SFR if csdid_window, ///
+>     ivar(zip_id) time(year) gvar(cl_entry_year_csdid) ///
+>     method(dripw) vce(cluster zip_id)
+Panel is not balanced
+Will use observations with Pair balanced (observed at t0 and t1)
+xx..........xxxxxxxxxxxxxxxxxxxxxxx..........xxxxx
+xxxxxxxxxxxxxx..........xxxxxxxxxxxxxxxxxxx.......
+...xxxxxxxxxxxxxxxxxxx..........xxxxxxxxxxxxxxxxxx
+x..........xxxxxxxxxxxxxxxxxxx..........xxxxxxxxxx
+xxxxxxxxx..........xxxxxxxxxxxxxxxxxxxx..........x
+xxxxxxxxxxxxxxxxxx..........xx
+Difference-in-difference with Multiple Time Periods
+
+                                                       Number of obs = 452,953
+Outcome model  : least squares
+Treatment model: inverse probability
+------------------------------------------------------------------------------
+             | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+g1995        |
+ t_1988_1989 |          0  (omitted)
+ t_1989_1990 |          0  (omitted)
+ t_1990_1991 |  -2.505448   .4833665    -5.18   0.000    -3.452829   -1.558067
+ t_1991_1992 |   -.736315   .4247671    -1.73   0.083    -1.568843    .0962133
+ t_1992_1993 |   1.525459   .5033978     3.03   0.002     .5388169      2.5121
+ t_1993_1994 |   .6411786   .6594669     0.97   0.331    -.6513528     1.93371
+ t_1994_1995 |   2.629002   .5454212     4.82   0.000     1.559996    3.698007
+ t_1994_1996 |   5.527976   .7508225     7.36   0.000     4.056391    6.999561
+ t_1994_1997 |   10.74585   1.184395     9.07   0.000     8.424474    13.06722
+ t_1994_1998 |   12.51045   1.268045     9.87   0.000     10.02513    14.99578
+ t_1994_1999 |   19.78612   2.043393     9.68   0.000     15.78114    23.79109
+ t_1994_2000 |   33.71913   2.938818    11.47   0.000     27.95916    39.47911
+ t_1994_2001 |          0  (omitted)
+ t_1994_2002 |          0  (omitted)
+ t_1994_2003 |          0  (omitted)
+ t_1994_2004 |          0  (omitted)
+ t_1994_2005 |          0  (omitted)
+ t_1994_2006 |          0  (omitted)
+ t_1994_2007 |          0  (omitted)
+ t_1994_2008 |          0  (omitted)
+ t_1994_2009 |          0  (omitted)
+ t_1994_2010 |          0  (omitted)
+ t_1994_2011 |          0  (omitted)
+ t_1994_2012 |          0  (omitted)
+ t_1994_2013 |          0  (omitted)
+ t_1994_2014 |          0  (omitted)
+ t_1994_2015 |          0  (omitted)
+ t_1994_2016 |          0  (omitted)
+-------------+----------------------------------------------------------------
+g2000        |
+ t_1988_1989 |          0  (omitted)
+ t_1989_1990 |          0  (omitted)
+ t_1990_1991 |          0  (omitted)
+ t_1991_1992 |          0  (omitted)
+ t_1992_1993 |          0  (omitted)
+ t_1993_1994 |          0  (omitted)
+ t_1994_1995 |          0  (omitted)
+ t_1995_1996 |   5.016503   .4601924    10.90   0.000     4.114542    5.918463
+ t_1996_1997 |   4.361709   .4664277     9.35   0.000     3.447528    5.275891
+ t_1997_1998 |   1.786724   .4812453     3.71   0.000     .8435001    2.729947
+ t_1998_1999 |   6.548779   .5544017    11.81   0.000     5.462172    7.635386
+ t_1999_2000 |   9.713824   .7044474    13.79   0.000     8.333132    11.09452
+ t_1999_2001 |   5.985617   .7891574     7.58   0.000     4.438896    7.532337
+ t_1999_2002 |   19.52832   1.044809    18.69   0.000     17.48053    21.57611
+ t_1999_2003 |   26.33561   1.276563    20.63   0.000      23.8336    28.83763
+ t_1999_2004 |   38.51658   1.687525    22.82   0.000     35.20909    41.82407
+ t_1999_2005 |   47.82312   2.006696    23.83   0.000     43.89006    51.75617
+ t_1999_2006 |          0  (omitted)
+ t_1999_2007 |          0  (omitted)
+ t_1999_2008 |          0  (omitted)
+ t_1999_2009 |          0  (omitted)
+ t_1999_2010 |          0  (omitted)
+ t_1999_2011 |          0  (omitted)
+ t_1999_2012 |          0  (omitted)
+ t_1999_2013 |          0  (omitted)
+ t_1999_2014 |          0  (omitted)
+ t_1999_2015 |          0  (omitted)
+ t_1999_2016 |          0  (omitted)
+-------------+----------------------------------------------------------------
+g2001        |
+ t_1988_1989 |          0  (omitted)
+ t_1989_1990 |          0  (omitted)
+ t_1990_1991 |          0  (omitted)
+ t_1991_1992 |          0  (omitted)
+ t_1992_1993 |          0  (omitted)
+ t_1993_1994 |          0  (omitted)
+ t_1994_1995 |          0  (omitted)
+ t_1995_1996 |          0  (omitted)
+ t_1996_1997 |   8.667531   1.315909     6.59   0.000     6.088396    11.24666
+ t_1997_1998 |   7.867562   1.373015     5.73   0.000     5.176503    10.55862
+ t_1998_1999 |   12.00516   1.334313     9.00   0.000     9.389959    14.62037
+ t_1999_2000 |   7.143949   1.435831     4.98   0.000     4.329771    9.958127
+ t_2000_2001 |     1.7647   1.326907     1.33   0.184    -.8359897    4.365391
+ t_2000_2002 |   18.56052   2.057585     9.02   0.000     14.52773    22.59332
+ t_2000_2003 |   32.13311   3.053458    10.52   0.000     26.14844    38.11778
+ t_2000_2004 |   46.50642   4.609511    10.09   0.000     37.47195     55.5409
+ t_2000_2005 |   62.26486   5.770444    10.79   0.000     50.95499    73.57472
+ t_2000_2006 |   75.25419    6.78902    11.08   0.000     61.94796    88.56043
+ t_2000_2007 |          0  (omitted)
+ t_2000_2008 |          0  (omitted)
+ t_2000_2009 |          0  (omitted)
+ t_2000_2010 |          0  (omitted)
+ t_2000_2011 |          0  (omitted)
+ t_2000_2012 |          0  (omitted)
+ t_2000_2013 |          0  (omitted)
+ t_2000_2014 |          0  (omitted)
+ t_2000_2015 |          0  (omitted)
+ t_2000_2016 |          0  (omitted)
+-------------+----------------------------------------------------------------
+g2002        |
+ t_1988_1989 |          0  (omitted)
+ t_1989_1990 |          0  (omitted)
+ t_1990_1991 |          0  (omitted)
+ t_1991_1992 |          0  (omitted)
+ t_1992_1993 |          0  (omitted)
+ t_1993_1994 |          0  (omitted)
+ t_1994_1995 |          0  (omitted)
+ t_1995_1996 |          0  (omitted)
+ t_1996_1997 |          0  (omitted)
+ t_1997_1998 |   3.779998   .8930932     4.23   0.000     2.029567    5.530428
+ t_1998_1999 |   8.694959   1.144403     7.60   0.000     6.451971    10.93795
+ t_1999_2000 |   11.31016   1.520374     7.44   0.000     8.330284    14.29004
+ t_2000_2001 |   6.810077   .9885457     6.89   0.000     4.872563    8.747591
+ t_2001_2002 |   21.88978   2.044454    10.71   0.000     17.88273    25.89684
+ t_2001_2003 |   37.32005   2.972457    12.56   0.000     31.49414    43.14596
+ t_2001_2004 |   66.26302   5.165918    12.83   0.000     56.13801    76.38804
+ t_2001_2005 |   100.7261   7.899061    12.75   0.000     85.24421     116.208
+ t_2001_2006 |   103.9557   7.816904    13.30   0.000     88.63487    119.2766
+ t_2001_2007 |   102.0267   7.586607    13.45   0.000     87.15724    116.8962
+ t_2001_2008 |          0  (omitted)
+ t_2001_2009 |          0  (omitted)
+ t_2001_2010 |          0  (omitted)
+ t_2001_2011 |          0  (omitted)
+ t_2001_2012 |          0  (omitted)
+ t_2001_2013 |          0  (omitted)
+ t_2001_2014 |          0  (omitted)
+ t_2001_2015 |          0  (omitted)
+ t_2001_2016 |          0  (omitted)
+-------------+----------------------------------------------------------------
+g2003        |
+ t_1988_1989 |          0  (omitted)
+ t_1989_1990 |          0  (omitted)
+ t_1990_1991 |          0  (omitted)
+ t_1991_1992 |          0  (omitted)
+ t_1992_1993 |          0  (omitted)
+ t_1993_1994 |          0  (omitted)
+ t_1994_1995 |          0  (omitted)
+ t_1995_1996 |          0  (omitted)
+ t_1996_1997 |          0  (omitted)
+ t_1997_1998 |          0  (omitted)
+ t_1998_1999 |    2.03541   .4860039     4.19   0.000      1.08286     2.98796
+ t_1999_2000 |   1.117524   .4908964     2.28   0.023     .1553848    2.079664
+ t_2000_2001 |   4.793619   .5578882     8.59   0.000     3.700179     5.88706
+ t_2001_2002 |   9.157746   .7934261    11.54   0.000      7.60266    10.71283
+ t_2002_2003 |   6.320877   .7416164     8.52   0.000     4.867336    7.774419
+ t_2002_2004 |    15.4411   1.246599    12.39   0.000     12.99781    17.88439
+ t_2002_2005 |   22.19962    1.70977    12.98   0.000     18.84853     25.5507
+ t_2002_2006 |   20.51833   1.641395    12.50   0.000     17.30126    23.73541
+ t_2002_2007 |   21.54731    1.70291    12.65   0.000     18.20967    24.88495
+ t_2002_2008 |   14.56084   1.386133    10.50   0.000     11.84407    17.27761
+ t_2002_2009 |          0  (omitted)
+ t_2002_2010 |          0  (omitted)
+ t_2002_2011 |          0  (omitted)
+ t_2002_2012 |          0  (omitted)
+ t_2002_2013 |          0  (omitted)
+ t_2002_2014 |          0  (omitted)
+ t_2002_2015 |          0  (omitted)
+ t_2002_2016 |          0  (omitted)
+-------------+----------------------------------------------------------------
+g2004        |
+ t_1988_1989 |          0  (omitted)
+ t_1989_1990 |          0  (omitted)
+ t_1990_1991 |          0  (omitted)
+ t_1991_1992 |          0  (omitted)
+ t_1992_1993 |          0  (omitted)
+ t_1993_1994 |          0  (omitted)
+ t_1994_1995 |          0  (omitted)
+ t_1995_1996 |          0  (omitted)
+ t_1996_1997 |          0  (omitted)
+ t_1997_1998 |          0  (omitted)
+ t_1998_1999 |          0  (omitted)
+ t_1999_2000 |   3.450091   .4420329     7.81   0.000     2.583722    4.316459
+ t_2000_2001 |   .9449294   .4504592     2.10   0.036     .0620456    1.827813
+ t_2001_2002 |   4.904757   .4912869     9.98   0.000     3.941852    5.867661
+ t_2002_2003 |   6.176312   .5791896    10.66   0.000     5.041122    7.311503
+ t_2003_2004 |   6.900116   .5757359    11.98   0.000     5.771695    8.028538
+ t_2003_2005 |   13.00538   .9479886    13.72   0.000     11.14735     14.8634
+ t_2003_2006 |   14.27524   1.053087    13.56   0.000     12.21123    16.33926
+ t_2003_2007 |   14.76461   1.136757    12.99   0.000     12.53661    16.99261
+ t_2003_2008 |   9.047676   .9422567     9.60   0.000     7.200887    10.89447
+ t_2003_2009 |   5.813152   .9615923     6.05   0.000     3.928466    7.697838
+ t_2003_2010 |          0  (omitted)
+ t_2003_2011 |          0  (omitted)
+ t_2003_2012 |          0  (omitted)
+ t_2003_2013 |          0  (omitted)
+ t_2003_2014 |          0  (omitted)
+ t_2003_2015 |          0  (omitted)
+ t_2003_2016 |          0  (omitted)
+-------------+----------------------------------------------------------------
+g2005        |
+ t_1988_1989 |          0  (omitted)
+ t_1989_1990 |          0  (omitted)
+ t_1990_1991 |          0  (omitted)
+ t_1991_1992 |          0  (omitted)
+ t_1992_1993 |          0  (omitted)
+ t_1993_1994 |          0  (omitted)
+ t_1994_1995 |          0  (omitted)
+ t_1995_1996 |          0  (omitted)
+ t_1996_1997 |          0  (omitted)
+ t_1997_1998 |          0  (omitted)
+ t_1998_1999 |          0  (omitted)
+ t_1999_2000 |          0  (omitted)
+ t_2000_2001 |   .0512919   .2280964     0.22   0.822    -.3957688    .4983526
+ t_2001_2002 |   2.101864   .3077771     6.83   0.000     1.498632    2.705096
+ t_2002_2003 |   2.175894   .3590366     6.06   0.000     1.472195    2.879593
+ t_2003_2004 |   3.191385    .376596     8.47   0.000     2.453271      3.9295
+ t_2004_2005 |   1.214128   .2971944     4.09   0.000      .631638    1.796619
+ t_2004_2006 |   .2813953   .3756711     0.75   0.454    -.4549065    1.017697
+ t_2004_2007 |   .2078556    .474038     0.44   0.661    -.7212417    1.136953
+ t_2004_2008 |   -.791889   .4847297    -1.63   0.102    -1.741942    .1581637
+ t_2004_2009 |  -1.658034    .474888    -3.49   0.000    -2.588797   -.7272708
+ t_2004_2010 |  -.7359288   .5546294    -1.33   0.185    -1.822982    .3511248
+ t_2004_2011 |          0  (omitted)
+ t_2004_2012 |          0  (omitted)
+ t_2004_2013 |          0  (omitted)
+ t_2004_2014 |          0  (omitted)
+ t_2004_2015 |          0  (omitted)
+ t_2004_2016 |          0  (omitted)
+-------------+----------------------------------------------------------------
+g2006        |
+ t_1988_1989 |          0  (omitted)
+ t_1989_1990 |          0  (omitted)
+ t_1990_1991 |          0  (omitted)
+ t_1991_1992 |          0  (omitted)
+ t_1992_1993 |          0  (omitted)
+ t_1993_1994 |          0  (omitted)
+ t_1994_1995 |          0  (omitted)
+ t_1995_1996 |          0  (omitted)
+ t_1996_1997 |          0  (omitted)
+ t_1997_1998 |          0  (omitted)
+ t_1998_1999 |          0  (omitted)
+ t_1999_2000 |          0  (omitted)
+ t_2000_2001 |          0  (omitted)
+ t_2001_2002 |   2.094739   .2581277     8.12   0.000     1.588818     2.60066
+ t_2002_2003 |   3.043733   .3048734     9.98   0.000     2.446192    3.641274
+ t_2003_2004 |   2.984879   .3147185     9.48   0.000     2.368042    3.601716
+ t_2004_2005 |    1.72531   .2681948     6.43   0.000     1.199658    2.250962
+ t_2005_2006 |  -1.012962   .2690991    -3.76   0.000    -1.540387   -.4855378
+ t_2005_2007 |  -1.793128   .3338561    -5.37   0.000    -2.447474   -1.138782
+ t_2005_2008 |  -4.204048   .3996427   -10.52   0.000    -4.987333   -3.420763
+ t_2005_2009 |  -5.646935   .4444578   -12.71   0.000    -6.518056   -4.775814
+ t_2005_2010 |  -5.039188   .4758312   -10.59   0.000      -5.9718   -4.106576
+ t_2005_2011 |  -4.090987   .5532317    -7.39   0.000    -5.175301   -3.006673
+ t_2005_2012 |          0  (omitted)
+ t_2005_2013 |          0  (omitted)
+ t_2005_2014 |          0  (omitted)
+ t_2005_2015 |          0  (omitted)
+ t_2005_2016 |          0  (omitted)
+-------------+----------------------------------------------------------------
+g2008        |
+ t_1988_1989 |          0  (omitted)
+ t_1989_1990 |          0  (omitted)
+ t_1990_1991 |          0  (omitted)
+ t_1991_1992 |          0  (omitted)
+ t_1992_1993 |          0  (omitted)
+ t_1993_1994 |          0  (omitted)
+ t_1994_1995 |          0  (omitted)
+ t_1995_1996 |          0  (omitted)
+ t_1996_1997 |          0  (omitted)
+ t_1997_1998 |          0  (omitted)
+ t_1998_1999 |          0  (omitted)
+ t_1999_2000 |          0  (omitted)
+ t_2000_2001 |          0  (omitted)
+ t_2001_2002 |          0  (omitted)
+ t_2002_2003 |          0  (omitted)
+ t_2003_2004 |   1.226774   .5979243     2.05   0.040     .0548639    2.398684
+ t_2004_2005 |    .720389   .4555284     1.58   0.114    -.1724302    1.613208
+ t_2005_2006 |  -.7768718   .4815236    -1.61   0.107    -1.720641    .1668972
+ t_2006_2007 |  -.5259751   .4351285    -1.21   0.227    -1.378811    .3268611
+ t_2007_2008 |  -1.164652   .5248049    -2.22   0.026    -2.193251   -.1360536
+ t_2007_2009 |  -2.980231   .6516661    -4.57   0.000    -4.257473   -1.702989
+ t_2007_2010 |  -2.509161   .8504873    -2.95   0.003    -4.176085   -.8422364
+ t_2007_2011 |  -.7937175   .9253016    -0.86   0.391    -2.607275     1.01984
+ t_2007_2012 |  -.9455844   1.044977    -0.90   0.366    -2.993703    1.102534
+ t_2007_2013 |   1.257939   1.427124     0.88   0.378    -1.539171     4.05505
+ t_2007_2014 |          0  (omitted)
+ t_2007_2015 |          0  (omitted)
+ t_2007_2016 |          0  (omitted)
+-------------+----------------------------------------------------------------
+g2009        |
+ t_1988_1989 |          0  (omitted)
+ t_1989_1990 |          0  (omitted)
+ t_1990_1991 |          0  (omitted)
+ t_1991_1992 |          0  (omitted)
+ t_1992_1993 |          0  (omitted)
+ t_1993_1994 |          0  (omitted)
+ t_1994_1995 |          0  (omitted)
+ t_1995_1996 |          0  (omitted)
+ t_1996_1997 |          0  (omitted)
+ t_1997_1998 |          0  (omitted)
+ t_1998_1999 |          0  (omitted)
+ t_1999_2000 |          0  (omitted)
+ t_2000_2001 |          0  (omitted)
+ t_2001_2002 |          0  (omitted)
+ t_2002_2003 |          0  (omitted)
+ t_2003_2004 |          0  (omitted)
+ t_2004_2005 |  -.5521076   .3307074    -1.67   0.095    -1.200282    .0960671
+ t_2005_2006 |   -.285667   .3681764    -0.78   0.438     -1.00728    .4359455
+ t_2006_2007 |  -.0431943   .5282914    -0.08   0.935    -1.078626    .9922378
+ t_2007_2008 |   .4074783   .6103465     0.67   0.504    -.7887788    1.603735
+ t_2008_2009 |   -.271356   .2702223    -1.00   0.315    -.8009819    .2582699
+ t_2008_2010 |  -.3966798   .2921735    -1.36   0.175    -.9693292    .1759697
+ t_2008_2011 |  -1.295039   .3356228    -3.86   0.000    -1.952848   -.6372309
+ t_2008_2012 |  -2.805716   .3728968    -7.52   0.000    -3.536581   -2.074852
+ t_2008_2013 |  -3.256405   .4147355    -7.85   0.000    -4.069272   -2.443539
+ t_2008_2014 |  -3.955587   .5013323    -7.89   0.000     -4.93818   -2.972994
+ t_2008_2015 |          0  (omitted)
+ t_2008_2016 |          0  (omitted)
+------------------------------------------------------------------------------
+Control: Never Treated
+
+See Callaway and Sant'Anna (2021) for details
+
+. 
+. csdid_estat simple
+Average Treatment Effect on Treated
+------------------------------------------------------------------------------
+             | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         ATT |   5.781111   .2982422    19.38   0.000     5.196567    6.365655
+------------------------------------------------------------------------------
+
+. matrix csdid_simple = r(table)
+
+. scalar csdid_att = csdid_simple[1,1]
+
+. scalar csdid_se = csdid_simple[2,1]
+
+. scalar csdid_p = csdid_simple[4,1]
+
+. quietly count if csdid_window & !missing(SFR)
+
+. scalar csdid_n = r(N)
+
+. 
+. post table1out ("CSDID") (csdid_att) (csdid_se) (csdid_p) (csdid_n) (.)
+
+. postclose table1out
+
+. 
+. preserve
+
+.     use `table1', clear
+
+.     format coefficient se p_value r_squared %9.4f
+
+.     format observations %12.0fc
+
+.     export delimited using "$TABLES/table1_baseline.csv", replace
+file /Users/isaacstern/Desktop/CL_Project/Working_CL/Craigslist_Replication_Package/output/table
+> s/table1_baseline.csv saved
+
+. restore
+
+. 
+. ********************************************************************************
+. * Figure 2 and Appendix Table A5. Baseline CSDID event study
+. ********************************************************************************
+. 
+. csdid_estat event, window(-5 5)
+ATT by Periods Before and After treatment
+Event Study:Dynamic effects
+------------------------------------------------------------------------------
+             | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+     Pre_avg |   2.614429   .1064953    24.55   0.000     2.405702    2.823156
+    Post_avg |   5.784028    .298384    19.38   0.000     5.199206     6.36885
+         Tm4 |   1.831172   .1357668    13.49   0.000     1.565074     2.09727
+         Tm3 |   2.306624   .1534293    15.03   0.000     2.005909     2.60734
+         Tm2 |   2.913346   .1719023    16.95   0.000     2.576424    3.250269
+         Tm1 |   3.406574   .1726426    19.73   0.000       3.0682    3.744947
+         Tp0 |    2.52173   .1657156    15.22   0.000     2.196933    2.846527
+         Tp1 |   3.707291    .238372    15.55   0.000     3.240091    4.174492
+         Tp2 |   5.701358   .3192602    17.86   0.000     5.075619    6.327096
+         Tp3 |    6.65694   .3913451    17.01   0.000     5.889918    7.423962
+         Tp4 |   7.605677   .4198356    18.12   0.000     6.782815     8.42854
+         Tp5 |   8.511171   .4589887    18.54   0.000      7.61157    9.410772
+------------------------------------------------------------------------------
+
+. csdid_plot, ///
+>     title("CSDID Event Study", size(medsmall) color(black) position(12)) ///
+>     subtitle("Craigslist entry and ZIP-level startup formation", size(small) color(gs6)) ///
+>     ytitle("ATT on startup formation rate", size(medsmall) margin(medium)) ///
+>     xtitle("Years relative to Craigslist entry", size(medsmall) margin(medium)) ///
+>     xlabel(-4(1)5, labsize(small) nogrid) ///
+>     ylabel(0(1)10, angle(horizontal) labsize(small) nogrid format(%9.1f)) ///
+>     yscale(range(0 10) lcolor(gs8) lwidth(thin)) ///
+>     xscale(noextend lcolor(gs8) lwidth(thin)) ///
+>     yline(0, lcolor(none)) legend(off) ///
+>     graphregion(color(white) lcolor(white%0) margin(medium)) ///
+>     plotregion(color(white) lcolor(white%0) margin(medium)) ///
+>     bgcolor(white) `graph_size'
+
+. 
+. graph export "$FIGURES/figure2_csdid_event.pdf", replace
+file
+    /Users/isaacstern/Desktop/CL_Project/Working_CL/Craigslist_Replication_Package/output/figu
+    > res/figure2_csdid_event.pdf saved as PDF format
+
+. graph export "$FIGURES/figure2_csdid_event.png", replace width(2200)
+file
+    /Users/isaacstern/Desktop/CL_Project/Working_CL/Craigslist_Replication_Package/output/figu
+    > res/figure2_csdid_event.png saved as PNG format
+
+. 
+. csdid_estat event, window(-5 5) estore(csdid_base_event)
+ATT by Periods Before and After treatment
+Event Study:Dynamic effects
+------------------------------------------------------------------------------
+             | Coefficient  Std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+     Pre_avg |   2.614429   .1064953    24.55   0.000     2.405702    2.823156
+    Post_avg |   5.784028    .298384    19.38   0.000     5.199206     6.36885
+         Tm4 |   1.831172   .1357668    13.49   0.000     1.565074     2.09727
+         Tm3 |   2.306624   .1534293    15.03   0.000     2.005909     2.60734
+         Tm2 |   2.913346   .1719023    16.95   0.000     2.576424    3.250269
+         Tm1 |   3.406574   .1726426    19.73   0.000       3.0682    3.744947
+         Tp0 |    2.52173   .1657156    15.22   0.000     2.196933    2.846527
+         Tp1 |   3.707291    .238372    15.55   0.000     3.240091    4.174492
+         Tp2 |   5.701358   .3192602    17.86   0.000     5.075619    6.327096
+         Tp3 |    6.65694   .3913451    17.01   0.000     5.889918    7.423962
+         Tp4 |   7.605677   .4198356    18.12   0.000     6.782815     8.42854
+         Tp5 |   8.511171   .4589887    18.54   0.000      7.61157    9.410772
+------------------------------------------------------------------------------
+
+. estimates restore csdid_base_event
+(results csdid_base_event are active now)
+
+. matrix event_b = e(b)
+
+. matrix event_V = e(V)
+
+. 
+. tempfile csdid_base_coefficients
+
+. postfile csbase str12 term double event_time estimate se using `csdid_base_coefficients', repl
+> ace
+(file /var/folders/y6/1132_sw9467159cnxrdm1jfr0000gn/T//S_57266.000004 not found)
+
+. post csbase ("Pre_avg") (.) (event_b[1,"Pre_avg"]) (sqrt(event_V["Pre_avg","Pre_avg"]))
+
+. post csbase ("Post_avg") (.) (event_b[1,"Post_avg"]) (sqrt(event_V["Post_avg","Post_avg"]))
+
+. foreach k in 4 3 2 1 {
+  2.     post csbase ("Tm`k'") (-`k') (event_b[1,"Tm`k'"]) (sqrt(event_V["Tm`k'","Tm`k'"]))
+  3. }
+
+. foreach k in 0 1 2 3 4 5 {
+  2.     post csbase ("Tp`k'") (`k') (event_b[1,"Tp`k'"]) (sqrt(event_V["Tp`k'","Tp`k'"]))
+  3. }
+
+. postclose csbase
+
+. 
+. preserve
+
+.     use `csdid_base_coefficients', clear
+
+.     gen ci_low = estimate - 1.96 * se
+
+.     gen ci_high = estimate + 1.96 * se
+
+.     export delimited using "$TABLES/tableA5_csdid_event.csv", replace
+file /Users/isaacstern/Desktop/CL_Project/Working_CL/Craigslist_Replication_Package/output/table
+> s/tableA5_csdid_event.csv saved
+
+. restore
+
+. 
+. ********************************************************************************
+. * Table 2. Craigslist and density interactions
+. ********************************************************************************
+. 
+. tempfile table2
+
+. postfile table2out str28 model double did_b did_se linear_b linear_se ///
+>     quadratic_b quadratic_se observations r_squared using `table2', replace
+(file /var/folders/y6/1132_sw9467159cnxrdm1jfr0000gn/T//S_57266.000006 not found)
+
+. 
+. reghdfe SFR did if !missing(density_1000_c), ///
+>     absorb(zip_id year zip_id#c.year) vce(cluster zip_id)
+(dropped 298 singleton observations)
+(MWFE estimator converged in 34 iterations)
+
+HDFE Linear regression                            Number of obs   =    707,161
+Absorbing 3 HDFE groups                           F(   1,  30965) =     145.64
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.9538
+                                                  Adj R-squared   =     0.9494
+                                                  Within R-sq.    =     0.0010
+Number of clusters (zip_id)  =     30,966         Root MSE        =    24.0506
+
+                            (Std. err. adjusted for 30,966 clusters in zip_id)
+------------------------------------------------------------------------------
+             |               Robust
+         SFR | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+         did |   4.216175   .3493657    12.07   0.000     3.531404    4.900946
+       _cons |   46.13466   .0898229   513.62   0.000      45.9586    46.31071
+------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-------------------------------------------------------+
+   Absorbed FE | Categories  - Redundant  = Num. Coefs |
+---------------+---------------------------------------|
+        zip_id |     30966       30966           0    *|
+          year |        29           1          28     |
+ zip_id#c.year |     30966           0       30966    ?|
+-------------------------------------------------------+
+? = number of redundant parameters may be higher
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. post table2out ("Base") (_b[did]) (_se[did]) (.) (.) (.) (.) (e(N)) (e(r2))
+
+. 
+. reghdfe SFR did did_density_1000_c if !missing(density_1000_c), ///
+>     absorb(zip_id year zip_id#c.year) vce(cluster zip_id)
+(dropped 298 singleton observations)
+(MWFE estimator converged in 97 iterations)
+
+HDFE Linear regression                            Number of obs   =    707,161
+Absorbing 3 HDFE groups                           F(   2,  30965) =      75.55
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.9538
+                                                  Adj R-squared   =     0.9494
+                                                  Within R-sq.    =     0.0010
+Number of clusters (zip_id)  =     30,966         Root MSE        =    24.0504
+
+                                  (Std. err. adjusted for 30,966 clusters in zip_id)
+------------------------------------------------------------------------------------
+                   |               Robust
+               SFR | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+-------------------+----------------------------------------------------------------
+               did |   4.077803   .3419153    11.93   0.000     3.407635    4.747971
+did_density_1000_c |   .0619173   .0671968     0.92   0.357    -.0697911    .1936258
+             _cons |   46.13304   .0903245   510.75   0.000       45.956    46.31008
+------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-------------------------------------------------------+
+   Absorbed FE | Categories  - Redundant  = Num. Coefs |
+---------------+---------------------------------------|
+        zip_id |     30966       30966           0    *|
+          year |        29           1          28     |
+ zip_id#c.year |     30966           0       30966    ?|
+-------------------------------------------------------+
+? = number of redundant parameters may be higher
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. post table2out ("Linear density") (_b[did]) (_se[did]) ///
+>     (_b[did_density_1000_c]) (_se[did_density_1000_c]) (.) (.) (e(N)) (e(r2))
+
+. 
+. reghdfe SFR did did_density_1000_c did_density_1000_c_sq, ///
+>     absorb(zip_id year zip_id#c.year) vce(cluster zip_id)
+(dropped 298 singleton observations)
+(MWFE estimator converged in 97 iterations)
+
+HDFE Linear regression                            Number of obs   =    707,161
+Absorbing 3 HDFE groups                           F(   3,  30965) =      50.32
+Statistics robust to heteroskedasticity           Prob > F        =     0.0000
+                                                  R-squared       =     0.9538
+                                                  Adj R-squared   =     0.9494
+                                                  Within R-sq.    =     0.0011
+Number of clusters (zip_id)  =     30,966         Root MSE        =    24.0491
+
+                                     (Std. err. adjusted for 30,966 clusters in zip_id)
+---------------------------------------------------------------------------------------
+                      |               Robust
+                  SFR | Coefficient  std. err.      t    P>|t|     [95% conf. interval]
+----------------------+----------------------------------------------------------------
+                  did |   3.639882   .3448954    10.55   0.000     2.963873    4.315891
+   did_density_1000_c |    .379213   .1323205     2.87   0.004     .1198594    .6385667
+did_density_1000_c_sq |  -.0051472   .0017883    -2.88   0.004    -.0086522   -.0016421
+                _cons |   46.12659   .0909332   507.26   0.000     45.94835    46.30482
+---------------------------------------------------------------------------------------
+
+Absorbed degrees of freedom:
+-------------------------------------------------------+
+   Absorbed FE | Categories  - Redundant  = Num. Coefs |
+---------------+---------------------------------------|
+        zip_id |     30966       30966           0    *|
+          year |        29           1          28     |
+ zip_id#c.year |     30966           0       30966    ?|
+-------------------------------------------------------+
+? = number of redundant parameters may be higher
+* = FE nested within cluster; treated as redundant for DoF computation
+
+. post table2out ("Quadratic density") (_b[did]) (_se[did]) ///
+>     (_b[did_density_1000_c]) (_se[did_density_1000_c]) ///
+>     (_b[did_density_1000_c_sq]) (_se[did_density_1000_c_sq]) (e(N)) (e(r2))
+
+. 
+. csdid SFR density_1000_c density_1000_c_sq ///
+>     if csdid_window & !missing(density_1000_c, density_1000_c_sq), ///
+>     ivar(zip_id) time(year) gvar(cl_entry_year_csdid) ///
+>     method(dripw) vce(cluster zip_id)
+Panel is not balanced
+Will use observations with Pair balanced (observed at t0 and t1)
+xx..........xxxxxxxxxxxxxxxxxxxxxxx..........xxxxx
+xxxxxxxxxxxxxx..........xxxxxxxxxxxxxxxxxxx.......
+...xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+x..........xxxxxxxxxxxxxxxxxxx..........xxxxxxxxxx
