@@ -1,7 +1,0 @@
-variable,level,observations,mean,sd,p25,p50,p75
-Startup formation rate (SFR),ZIP-year,824710,42.040287,100.52195,2,8,35
-Post-Craigslist indicator,ZIP-year,824710,.27041143,.44417262,0,0,1
-Ever Craigslist indicator,ZIP-year,824710,.61468756,.48666933,0,1,1
-ZCTA 2000 population,ZIP,31264,8948.8896,13053.097,798,2804,11951
-ZCTA 2000 density,ZIP,31264,1145.6288,4338.6265,20.901737,71.502495,536.36011
-Craigslist entry year,Treated ZIP,22601,2005.0114,2.6432588,2004,2005,2006

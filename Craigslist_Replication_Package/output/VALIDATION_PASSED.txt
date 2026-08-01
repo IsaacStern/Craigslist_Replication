@@ -1,1 +1,0 @@
-All headline coefficients and sample sizes match the paper within the documented rounding tolerances.
