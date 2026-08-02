@@ -4,11 +4,6 @@
 
 This repository reproduces the tables and figures reported in *Bazaar Effects in the Digital Marketplace*. The pipeline begins with the earliest source-level files available for this project, constructs the ZIP-year analysis panel, estimates the reported models, exports publication figures and tidy tables, and verifies the headline results against the manuscript.
 
-## Reproduction status
-
-The package is self-contained at the **published source-data level**, but not at the underlying micro-record level. The Startup Cartography Project input is a ZIP-year data product created by its authors from business-registration microdata; those underlying registrations and the SCP prediction pipeline are not present. Likewise, the Craigslist entry file comes from the authors' replication materials rather than from a new scrape of historical Craigslist pages.
-
-One source-provenance issue remains before public release: `ZIP_to_FIPS.csv` is present and fully reproducible as an input, but the workspace does not identify its original publisher or download URL. Its checksum is recorded, and its role is documented in `DATA_SOURCES.md`.
 
 ## Repository structure
 
