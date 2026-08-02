@@ -92,7 +92,3 @@ Successful completion creates `output/VALIDATION_PASSED.txt`.
 - Kernel distance and weight variables are stored in double precision. Single-precision intermediates are numerically unstable in this model after ZIP-specific trends are absorbed and do not reproduce the paper.
 
 The manuscript values checked by the pipeline are collected in `EXPECTED_RESULTS.md`. This provides a compact audit target without treating previously generated estimates as inputs.
-
-## Public-release checklist
-
-Before uploading the data files publicly, confirm that the redistribution terms for the Startup Cartography Project and Craigslist replication inputs permit GitHub distribution. If redistribution is restricted, keep the code public, remove the affected source file, and provide download-and-placement instructions using the filenames already expected by the scripts.
