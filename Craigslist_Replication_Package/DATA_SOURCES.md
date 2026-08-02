@@ -10,8 +10,6 @@
 
 **Documented source page:** https://www.startupcartography.com/data
 
-**Important limitation:** This is the earliest SCP file available in the project, but it is an author-produced aggregate rather than raw business-registration microdata. Reconstructing SCP measures from individual registrations is therefore outside the feasible replication boundary.
-
 ## 2. Craigslist entry timing
 
 **File:** `data/source/craigslist/CL_entry.dta`
