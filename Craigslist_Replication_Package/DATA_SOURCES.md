@@ -32,7 +32,7 @@
 
 **Outstanding provenance issue:** The file schema and filename correspond to Domo's `zip_to_fips.csv` Dimensions product, but the project retained neither the original download note nor a permanent URL for this particular March 2024 extract. Exact reproduction is possible from the included file, but a public archive should describe this attribution as inferred or replace the file with a documented crosswalk and report whether results change.
 
-**Likely product documentation:** https://www.domo.com/docs/s/article/360042931454
+**Documentation:** https://www.domo.com/docs/s/article/360042931454
 
 ## 4. Census 2000 ZCTA Gazetteer
 
@@ -57,7 +57,3 @@
 **Origin:** NBER Census CBSA-to-FIPS county crosswalk, March 2020 version.
 
 **NBER source page:** https://www.nber.org/research/data/census-core-based-statistical-area-cbsa-federal-information-processing-series-fips-county-crosswalk
-
-## Inputs intentionally excluded
-
-BDS, Starbucks, newspaper, internet-provider, racial-border, and Census 1990 files are not used by any table or figure in the current paper and are intentionally excluded from this replication package.
